@@ -1,20 +1,5 @@
+use crate::matrix::Matrix;
 use std::convert::TryInto;
-
-pub fn hash(mut input: Vec<u8>) -> [u8; 16] {
-    add_padding(&mut input);
-    let hash = input
-        .chunks(20)
-        .fold((Matrix::zeros(), vec![0]), |acc, element| {
-            let input: Vec<u16> = element
-                .chunks(2)
-                .map(|x| (x[0] as u16) << 8 | (x[1] as u16))
-                .collect();
-            assert_eq!(input.len(), 10);
-            keccak(acc.0, input.try_into().expect("Slice with incorrect size"))
-        });
-
-    to_array(hash.1)
-}
 
 fn to_array(hash: Vec<u16>) -> [u8; 16] {
     let flattened: Vec<u8> = hash
@@ -36,55 +21,33 @@ fn add_padding(input: &mut Vec<u8>) {
     input[payload_size] = 0x80;
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct Matrix([[u16; 5]; 5]);
+pub fn hash(mut input: Vec<u8>) -> [u8; 16] {
+    add_padding(&mut input);
+    let mut state = Matrix::zeros();
 
-impl Matrix {
-    fn zeros() -> Self {
-        Matrix([[0u16; 5]; 5])
+    for input in input.chunks(20) {
+        let input: Vec<u16> = input
+            .chunks(2)
+            .map(|x| (x[0] as u16) << 8 | (x[1] as u16))
+            .collect();
+
+        for i in 0..5 {
+            state.0[0][i] ^= input[i];
+            state.0[1][i] ^= input[i + 5];
+        }
+        rounds(&mut state);
     }
-}
 
-impl std::fmt::Display for Matrix {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|y| format!("{:x}", y))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                })
-                .collect::<Vec<String>>()
-                .join("\n")
-        )
-    }
-}
-
-fn keccak(mut a: Matrix, w: [u16; 10]) -> (Matrix, Vec<u16>) {
-
-    println!("input");
-    w.iter().for_each(|x| print!("{:x},", x));
-    for i in 0..5 {
-        a.0[0][i] ^= w[i];
-        a.0[1][i] ^= w[i + 5];
-    }
-    println!("");
-
-    rounds(&mut a);
     let mut partial_result = [0u16; 5];
-    partial_result.copy_from_slice(&a.0[0][..]);
-    rounds(&mut a);
+    partial_result.copy_from_slice(&state.0[0][..]);
+    rounds(&mut state);
     let result: Vec<u16> = partial_result
         .iter()
         .map(|x| x.clone())
-        .chain(a.0[0][0..=2].iter().map(|x| x.clone()))
+        .chain(state.0[0][0..=2].iter().map(|x| x.clone()))
         .collect();
 
-    (a.clone(), result)
+    to_array(result)
 }
 
 fn rounds(a: &mut Matrix) {
@@ -184,6 +147,20 @@ mod tests {
                 [
                     0x07, 0x2F, 0xB0, 0x3B, 0xC3, 0xC9, 0x96, 0x50, 0x66, 0x3B, 0x2B, 0x89, 0xA6,
                     0xE9, 0x9F, 0x74,
+                ],
+            ),
+            (
+                "a".repeat(48479).as_str(),
+                [
+                    0xAA, 0x64, 0x8B, 0xAE, 0xF6, 0x95, 0x48, 0x33, 0xF9, 0x55, 0x5D, 0x55, 0xA7,
+                    0x97, 0xD2, 0xCB,
+                ],
+            ),
+            (
+                "a".repeat(48958).as_str(),
+                [
+                    0x9A, 0x9C, 0x15, 0x4F, 0x81, 0x7A, 0x48, 0xE4, 0xE2, 0x8D, 0x8A, 0x8C, 0x68,
+                    0x7A, 0xCD, 0x60,
                 ],
             ),
         ]
