@@ -46,10 +46,13 @@ fn main() {
     .for_each(|x| brute_force(x.0, x.1));
 }
 
-fn brute_force(chars: usize, expected: [u8; 16]) {
+fn brute_force(chars_count: usize, expected: [u8; 16]) {
     let start = Instant::now();
-
-    let p = permutations(&CHARS[..], chars).par_bridge().find_any(|p| {
+    let mut chars = [0u8; 79];
+    chars.copy_from_slice(&CHARS[..]);
+    chars.reverse();
+    
+    let p = permutations(&chars[..], chars_count).par_bridge().find_any(|p| {
         if expected == minikeccak::core::hash(p.clone()) {
             true
         } else {
@@ -70,18 +73,6 @@ fn brute_force(chars: usize, expected: [u8; 16]) {
     }
 }
 
-// impl ParallelIterator for PermutationIterator
-// {
-//     type Item = Vec<u8>;
-
-//     fn drive_unindexed<C>(self, consumer: C) -> C::Result
-//     where
-//         C: rayon::iter::plumbing::UnindexedConsumer<Self::Item>{
-//             todo!()
-//                 consumer.
-//         }
-
-// }
 struct PermutationIterator<'a, T: 'a> {
     universe: &'a [T],
     size: usize,
