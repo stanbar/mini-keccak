@@ -19,3 +19,15 @@ path = "src/reverse_hash.rs"
 
 [dependencies]
 rayon = "1.5"
+
+[dev-dependencies]
+criterion = "0.3.4"
+
+[[bench]]
+name = "permutation"
+harness = false
+
+[[bench]]
+name = "hash"
+harness = false
+
